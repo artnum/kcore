@@ -301,7 +301,7 @@ function KSelectUI(input, store, options = { attribute: 'name', allowFreeText: t
                 })
             })
             .catch(error => { 
-                console.log(r)
+                console.log(error)
                 resolve()
             })
         })
