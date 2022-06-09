@@ -32,7 +32,7 @@ function KCORELoad () {
             }
         }
 
-        if (window.KCORE.NoPopper) {
+        if (window.KCORE?.NoPopper) {
             scripts.shift()
         }
 
