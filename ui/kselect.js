@@ -28,6 +28,9 @@ function KSelectUI(input, store, options = { attribute: 'name', allowFreeText: t
         parent.removeChild(this.input)
         this.inputEventTarget.appendChild(this.input)
     })
+    if (options.tree) {
+        this.tree = options.tree
+    }
     if (!options.attribute) { options.attribute = 'name' }
     this.store = store
     if (options.realSelect) {
@@ -87,7 +90,7 @@ function KSelectUI(input, store, options = { attribute: 'name', allowFreeText: t
     })
     obj.value = input.value
     this.object = obj
-    var list = document.createElement('DIV')
+    const list = document.createElement('DIV')
     list.classList.add('kdropdown')
     list.style.position = 'absolute'
     this.popper = null
@@ -215,7 +218,7 @@ function KSelectUI(input, store, options = { attribute: 'name', allowFreeText: t
         return new Promise((resolve, reject) => {
             const input = this.input
             const kclosable = new KClosable()
-            this.closableIdx = kclosable.add(null, {function: degenerate})
+            this.closableIdx = kclosable.add(list, {function: degenerate, mouse: true, parent: this.input})
             window.requestAnimationFrame(() => {
                 list.style.zIndex = KZ()
                 if (!list.parentNode) {
@@ -226,7 +229,7 @@ function KSelectUI(input, store, options = { attribute: 'name', allowFreeText: t
             if (value === null) {
                 value = input.value
             }
-            let currentValue = undefined
+            let currentValue
             if (options.realSelect && !options.allowFreeText) {
                 currentValue = input.dataset.value
             }
@@ -236,8 +239,12 @@ function KSelectUI(input, store, options = { attribute: 'name', allowFreeText: t
             store.query({[options.attribute]: `${value}*`})
             .then((data) => {
                 if (this.latestRequest !== currentRequest) { return }
-                const frag = document.createDocumentFragment()
 
+                if (this.tree) {
+                    data = this.treeSort(data)
+                }
+            
+                const frag = document.createDocumentFragment()
                 let selected = null
                 for (const entry of data) {
                     const s = document.createElement('DIV')
@@ -253,10 +260,16 @@ function KSelectUI(input, store, options = { attribute: 'name', allowFreeText: t
                             symbol.style.color = KCSSColor(entry.color)
                             s.dataset.color = KCSSColor(entry.color)
                         }
+                        if (entry['#level'] > 0) {
+                            symbol.innerHTML += '&hybull;'.repeat(entry['#level']) + symbol.innerHTML
+                        }
                         s.appendChild(symbol)
-                        s.innerHTML += entry.label ?? entry[options.attribute]
+                        s.innerHTML += this.highlight(entry.label ?? entry[options.attribute], value)
                     } else {
-                        s.innerHTML = entry.label ?? entry[options.attribute]
+                        s.innerHTML = this.highlight(entry.label ?? entry[options.attribute], value)
+                        if (entry['#level'] > 0) {
+                            s.innerHTML = '&hybull;'.repeat(entry['#level'])  + s.innerHTML
+                        }
                     }
                     s.dataset.label = entry.label ?? entry[options.attribute] ?? s.textContent
 
@@ -277,6 +290,10 @@ function KSelectUI(input, store, options = { attribute: 'name', allowFreeText: t
                     posCount++
                     s.dataset.position = posCount
                     frag.appendChild(s)
+                    
+                    /* delete as object stay in cache, so we ensure next run is clean */
+                    delete entry['#visited']
+                    delete entry['#level']     
                 }
                 new Promise((resolve) => {
                     window.requestAnimationFrame(() => {
@@ -295,7 +312,8 @@ function KSelectUI(input, store, options = { attribute: 'name', allowFreeText: t
                         resolve()
                         return false
                     })
-                }).then(_ => {
+                })
+                .then(_ => {
                     resolve()
                     input.focus()
                 })
@@ -310,7 +328,6 @@ function KSelectUI(input, store, options = { attribute: 'name', allowFreeText: t
     this.EvtTarget.addEventListener('open', () => { generate('') })
     this.EvtTarget.addEventListener('close', () => { degenerate() })
 
-    input.addEventListener('blur', this.blur.bind(this))
     this.inputEventTarget.addEventListener('keyup', handleEvents.bind(this), {capture: true})
     this.inputEventTarget.addEventListener('keydown', (event) => {
         switch(event.key) {
@@ -472,11 +489,71 @@ KSelectUI.prototype.error = function () {
     // nothing yet
 }
 
-KSelectUI.prototype.blur = function (event) {
-    this.close()
-}
-
 KSelectUI.prototype.update = function () {
     if (!this.popper) { return }
     return this.popper.update()
+}
+
+KSelectUI.prototype.highlight = function (label, value) {
+    value = value.replaceAll('*', ' ')
+    value = value.trim()
+    const words = value.split(' ')
+    const wPos = []
+    for (const word of words) {
+        const s = label.toLowerCase().toAscii().indexOf(word.toLowerCase().toAscii())
+        if (s !== -1) {
+            let add = true
+            if (wPos.find(e => (e[0] === s && e[1] === word.length))) { add = false }
+            if (add) { wPos.push([s, word.length]) }
+        }
+    }
+
+    if (wPos.length < 1) { return label }
+
+    wPos.sort((a, b) => { return a[0] - b[0] })
+    let count = 0
+    for (const w of wPos) {
+        label = `${label.substring(0, w[0] + (count * 27))}<span class="match">${label.substring(w[0] + (count * 27), w[0] + w[1] + (count * 27))}</span>${label.substring(w[0] + w[1] + (count * 27))}`
+        count++
+        
+    }
+    return label
+}
+
+KSelectUI.prototype.treeSort = function (data, parent, level = 0, ordered = []) {
+    if (!this.tree.parent) { return data }
+
+    if (parent) {
+        for (const entry of data) {
+            if (!entry[this.tree.parent]) { continue }
+            if (entry['#visited']) { continue }
+            if (entry[this.tree.parent] && entry[this.tree.parent] !== parent.value) { continue }
+            entry['#visited'] = true
+            entry['#level'] = level
+            ordered.push(entry)
+            this.treeSort(data, entry, level + 1, ordered)
+        }
+        return ordered
+    }
+
+    for (const entry of data) {
+        if (entry['#visited']) { continue }
+        if (!entry[this.tree.parent]) {
+            entry['#visited'] = true
+            entry['#level'] = level
+            ordered.push(entry)
+            this.treeSort(data, entry, level + 1, ordered)
+        }
+    }
+
+    /* add parent-less entries */
+    for (const entry of data) {
+        if (entry['#visited']) { continue }
+        entry['#level'] = level
+        entry['#visited'] = true
+        ordered.push(entry)
+        this.treeSort(data, entry, level + 1, ordered)
+    }
+
+    return ordered
 }
