@@ -2,7 +2,7 @@
   "name": "kcore",
   "license": "MIT",
   "main": "js/index.js",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "dependencies": {
     "jshint": "^2.13.4"
   }

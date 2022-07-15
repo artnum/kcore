@@ -49,10 +49,10 @@ function krequest (url, options = {}) {
             KREQUEST._worker = new Worker(URL.createObjectURL(krequest_blob))
             KREQUEST._worker.onmessage = function (message) {
                 const response = message.data
-
                 if (!response.xreqid) { return }
-                if (!this._queries.has(xreqid)) { return }
-                const [resolve, reject] = this._queries.get(xreqid)
+                if (!this._queries.has(response.xreqid)) { return }
+                const [resolve, reject] = this._queries.get(response.xreqid)
+                this._queries.delete(response.xreqid)
                 if (response.error) { return reject(response.error) }
                 return resolve(response)
             }.bind(KREQUEST)
@@ -73,11 +73,11 @@ function krequest (url, options = {}) {
             }
         }
         if (options.headers['X-Request-Id'] === undefined) {
-            xreqid = options.headers['X-Request-Id'] = ++KREQUEST._id
+            xreqid = ++KREQUEST._id
+            options.headers['X-Request-Id'] = xreqid
         } else {
             xreqid = options.headers['X-Request-Id']
         }
-
 
         KREQUEST._queries.set(xreqid, [resolve, reject])
         KREQUEST._worker.postMessage({
