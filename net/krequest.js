@@ -54,8 +54,7 @@ function krequest (url, options = {}) {
                 if (!this._queries.has(xreqid)) { return }
                 const [resolve, reject] = this._queries.get(xreqid)
                 if (response.error) { return reject(response.error) }
-                /* response.content contains two fields : body and headers */
-                return resolve(response.content)
+                return resolve(response)
             }.bind(KREQUEST)
         }
 
