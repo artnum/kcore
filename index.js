@@ -16,6 +16,7 @@ function KCORELoad () {
             'ui/kz.js',
             'ui/kcolor.js',
             'ui/kcalcselector.js',
+            'ui/kdom.js',
             'css/index.css'
         ]
 
