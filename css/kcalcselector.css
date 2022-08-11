@@ -1,0 +1,39 @@
+.k-calc-selector {
+    font-family: sans-serif;
+}
+
+.k-calc-body {
+    max-height: calc(1.2em * 12);
+    overflow-y: scroll;
+}
+/* display scrollbar so width is equal as body width */
+.k-calc-head {
+    overflow-y: scroll;
+    background-color: black;
+    color: white;
+}
+
+.k-calc-input input {
+    width: calc(100% - 20px);
+    padding: 4px;
+    margin: 4px;
+    border: 2px inset gray;
+    line-height: 2em;
+}
+
+.k-calc-head, .k-calc-row {
+    display: grid;
+    grid-template-columns: 24px repeat(var(--columns), 1fr);
+}
+
+.k-calc-row:hover {
+    background-color: bisque;
+}
+
+.k-calc-head > div, .k-calc-row > div {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-height: 1.2em;
+    line-height: 1.2em;
+    margin: 4px;
+}
