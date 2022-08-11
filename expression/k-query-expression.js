@@ -40,12 +40,13 @@ KQueryExpr.fromString = function (string, options = {}) {
     const CCODE = ["+93", "+358", "+355", "+213", "+1684", "+376", "+244", "+1264", "+672", "+1268", "+54", "+374", "+297", "+61", "+43", "+994", "+1242", "+973", "+880", "+1246", "+375", "+32", "+501", "+229", "+1441", "+975", "+591", "+387", "+267", "+55", "+246", "+673", "+359", "+226", "+257", "+855", "+237", "+1", "+238", "+354", "+236", "+235", "+56", "+86", "+61", "+61", "+57", "+269", "+242", "+243", "+682", "+506", "+225", "+385", "+53", "+357", "+420", "+45", "+253", "+1767", "+1849", "+593", "+20", "+503", "+240", "+291", "+372", "+251", "+500", "+298", "+679", "+358", "+33", "+594", "+689", "+241", "+220", "+995", "+49", "+233", "+350", "+30", "+299", "+1473", "+590", "+1671", "+502", "+44", "+224", "+245", "+595", "+509", "+379", "+504", "+852", "+36", "+354", "+91", "+62", "+98", "+964", "+353", "+44", "+972", "+39", "+1876", "+81", "+44", "+962", "+77", "+254", "+686", "+850", "+82", "+965", "+996", "+856", "+371", "+961", "+266", "+231", "+218", "+423", "+370", "+352", "+853", "+389", "+261", "+265", "+60", "+960", "+223", "+356", "+692", "+596", "+222", "+230", "+262", "+52", "+691", "+373", "+377", "+976", "+382", "+1664", "+212", "+258", "+95", "+264", "+674", "+977", "+31", "+599", "+687", "+64", "+505", "+227", "+234", "+683", "+672", "+1670", "+47", "+968", "+92", "+680", "+970", "+507", "+675", "+595", "+51", "+63", "+872", "+48", "+351", "+1939", "+974", "+40", "+7", "+250", "+262", "+590", "+290", "+1869", "+1758", "+590", "+508", "+1784", "+685", "+378", "+239", "+966", "+221", "+381", "+248", "+232", "+65", "+421", "+386", "+677", "+252", "+27", "+211", "+500", "+34", "+94", "+249", "+597", "+47", "+268", "+46", "+41", "+963", "+886", "+992", "+255", "+66", "+670", "+228", "+690", "+676", "+1868", "+216", "+90", "+993", "+1649", "+688", "+256", "+380", "+971", "+44", "+1", "+598", "+998", "+678", "+58", "+84", "+1284", "+1340", "+681", "+967", "+260", "+263"]
     options = Object.assign({attribute: 'name'}, options)
 
-    const regExp = new RegExp(/(:?[\+|0]\s*[0-9\.\-\(\)\s]+|[a-zA-Z0-9+-_%+\-.~]+@[A-Za-z0-9.]+\.[A-Za-z0-9]+|[^\s]+)/, 'g')
+    const regExp = new RegExp(/(:?[\+|0]?\s*[0-9\.\-\(\)\s]+|[a-zA-Z0-9+-_%+\-.~]+(?<=\@)[A-Za-z0-9.\-]+(?<=\.)[A-Za-z]+|[^\s]+)/, 'g')
     const values = Array.from(string.matchAll(regExp))
         .map(e => e[0])
         .map(e => {
+            let neg = false
             e = e.trim()
-            if (/[\+|0]\s*[0-9\.\-\(\)\s]+/.test(e)) {
+            if (/[\+|0]?\s*[0-9\.\-\(\)\s]+/.test(e)) {
                 for(const code of CCODE) {
                     if (e.indexOf(code) === 0) {
                         e = e.substring(code.length)
@@ -55,30 +56,32 @@ KQueryExpr.fromString = function (string, options = {}) {
                 while (e.length > 0 && e.startsWith('0')) {
                     e = e.substring(1)
                 }
-                return [e.replaceAll(/\s/g, '*'), 'phone']
+                e = e.replaceAll(/\s/g, '*')
+                return [e, 'phone']
             }
-            if (/[a-zA-Z0-9+-_%+\-.~]+@[A-Za-z0-9.]+\.[A-Za-z0-9]+/.test(e)) {
+            if (/[a-zA-Z0-9+-_%+\-.~]+(?<=\@)[A-Za-z0-9.]+(?<=\.)[A-Za-z0-9]+/.test(e)) {
                 return [e, 'mail']
             }
-            return [e, '']
+            
+            const x = [e, '']
+            return x
         })
         .filter(e => e[0] !== '')
 
-    
+
+
+    const state = {
+        inexact: false, // "in exact search term" 
+        negation: false,
+        type: ''
+    }
     const expression = []
-    const pushToExpression = (value, type) => {
-        if (state.negation) {
+    const pushToExpression = (value, type, neg = false) => {
+        if (neg) {
             expression.push(['!=', value, type])
-            state.negation = false
             return
         }
         expression.push(['=', value, type])
-    }
-
-    const state = {
-        inexact: false,
-        negation: false,
-        type: ''
     }
 
     let buffer = ''
@@ -95,8 +98,9 @@ KQueryExpr.fromString = function (string, options = {}) {
         }
 
         if (value.startsWith('-')) {
-            value = value.substring(1)
             state.negation = true
+            if (value === '-') { continue }
+            value = value.substring(1)
         }
         if (value.startsWith('+')) {
             value = `"${value.substring(1)}"`
@@ -116,8 +120,9 @@ KQueryExpr.fromString = function (string, options = {}) {
             if (value.endsWith('"')) { value = value.substring(0, value.length - 1)}
 
             if (state.inexact) {
-                if (buffer === '') { pushToExpression(value, state.type) }
-                else { pushToExpression(`${buffer} ${value}`, state.type) }
+                if (buffer === '') { pushToExpression(value, state.type, state.negation) }
+                else { pushToExpression(`${buffer} ${value}`, state.type, state.negation) }
+                state.negation = false
                 buffer = ''
                 state.inexact = false
                 continue
@@ -132,11 +137,13 @@ KQueryExpr.fromString = function (string, options = {}) {
             buffer = `${buffer} ${value}`
             continue
         }
-        pushToExpression(`*${value}*`, state.type)
+        pushToExpression(`*${value}*`, state.type, state.negation)
+        state.negation = false
     }
 
     if (state.inexact) {
-        pushToExpression(buffer, state.type)
+        pushToExpression(buffer, state.type, state.negation)
+        state.negation = false
     }
 
     const request = {}
@@ -146,6 +153,7 @@ KQueryExpr.fromString = function (string, options = {}) {
     let subcount = 0
     let subattrcount = 0
     let attrcount = 0
+    let notcount = 0
 
     /* if any is set as "phone" attribute, set values only to "phone" value
      * and any that is not phone as others value ... if that make sense
@@ -169,7 +177,16 @@ KQueryExpr.fromString = function (string, options = {}) {
                     where[`${typed[0][0]}:${count}`] = expr.slice(0, 2)
                     return 
                 }
-
+                /* in case of negative expression, we want to AND all of them */
+                if (expr[0] === '!=') {
+                    expr[0] = '='
+                    where[`#not:${++notcount}`] = {}
+                    where[`#not:${notcount}`][`#or:${++orcount}`] = {}
+                    for (const t of typed) {
+                        where[`#not:${notcount}`][`#or:${orcount}`][`${t[0]}:${count}`] = expr.slice(0, 2)
+                    }
+                    return
+                }
                 where[`#or:${++orcount}`] = {}
                 for (const t of typed) {
                     where[`#or:${orcount}`][`${t[0]}:${count}`] = expr.slice(0, 2)
@@ -178,33 +195,44 @@ KQueryExpr.fromString = function (string, options = {}) {
             }
         }
 
-        for(const attr of options.attribute) {
-            const notphones = options.attribute.filter(e => {
-                if (!Array.isArray(e)) { return e}
-                if (Array.isArray(e) && e[1] !== 'phone') {
-                    return e
-                }
-            })
+        const notphones = options.attribute.filter(e => {
+            if (!Array.isArray(e)) { return e}
+            if (Array.isArray(e) && e[1] === '') {
+                return e
+            }
+        })
 
-            if (notphones.length > 0) {
-                if (notphones.length === 1) {
-                    if (Array.isArray(notphones[0])) {
-                        where[`${notphones[0][0]}:${count}`] = expr.slice(0, 2)
-                        return 
-                    }
-                    where[`${notphones[0]}:${count}`] = expr.slice(0, 2)
-                    return
+        if (notphones.length > 0) {
+            if (notphones.length === 1) {
+                if (Array.isArray(notphones[0])) {
+                    where[`${notphones[0][0]}:${count}`] = expr.slice(0, 2)
+                    return 
                 }
-                where[`#or:${++orcount}`] = {}
-                for (const notphone of notphones) {
-                    if (Array.isArray(notphone)) {
-                        where[`#or:${orcount}`][`${notphone[0]}:${count}`] = expr.slice(0, 2)
-                        continue
-                    }
-                    where[`#or:${orcount}`][`${notphone}:${count}`] = expr.slice(0, 2)
-                }
+                where[`${notphones[0]}:${count}`] = expr.slice(0, 2)
                 return
             }
+            if (expr[0] === '!=') {
+                expr[0] = '='
+                where[`#not:${++notcount}`] = {}
+                where[`#not:${notcount}`][`#or:${++orcount}`] = {}
+                for (const notphone of notphones) {
+                    if (Array.isArray(notphone)) {
+                        where[`#not:${notcount}`][`#or:${orcount}`][`${notphone[0]}:${count}`] = expr.slice(0, 2)
+                        continue
+                    }
+                    where[`#not:${notcount}`][`#or:${orcount}`][`${notphone}:${count}`] = expr.slice(0, 2)
+                }        
+                return 
+            }
+            where[`#or:${++orcount}`] = {}
+            for (const notphone of notphones) {
+                if (Array.isArray(notphone)) {
+                    where[`#or:${orcount}`][`${notphone[0]}:${count}`] = expr.slice(0, 2)
+                    continue
+                }
+                where[`#or:${orcount}`][`${notphone}:${count}`] = expr.slice(0, 2)
+            }
+            return
         }
     }
 
