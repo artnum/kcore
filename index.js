@@ -10,10 +10,12 @@ function KCORELoad () {
         const scripts = [
             'https://unpkg.com/@popperjs/core@2',
             'net/krequest.js',
+            'expression/k-query-expression.js',
             'ui/kselect.js',
             'ui/kclosable.js',
             'ui/kz.js',
             'ui/kcolor.js',
+            'ui/kcalcselector.js',
             'css/index.css'
         ]
 
