@@ -10,6 +10,7 @@ function KCalcSelector (dataSource, headers) {
     this.headers = headers
     this.fields = []
     this.currentSet = []
+    this.selected = []
 }
 
 KCalcSelector.prototype.getNode = function () {
@@ -39,7 +40,6 @@ KCalcSelector.prototype.render = function () {
         searchInput.innerHTML = '<input type="text" value=""></input>'
         searchInput.addEventListener('input', kfwthrottle(event => {
             try {
-                console.log(event.target.value)
                 this.search(event.target.value)
                 .then(results => {
                     this.showResults(results)
@@ -88,6 +88,16 @@ KCalcSelector.prototype.render = function () {
 
         this.domNode.style.setProperty('--columns', this.fields.length)
 
+        const selected = KDom.create('div')
+        selected.classList.add('k-calc-selected')
+        this.domNode.query('div.k-calc-body')
+        .then(node => {
+            this.domNode.replace(selected, node)
+        })
+        .catch(() => {
+            this.domNode.append(selected)
+        })
+
         const body = KDom.create('div')
         body.classList.add('k-calc-body')
         this.domNode.query('div.k-calc-body')
@@ -102,8 +112,18 @@ KCalcSelector.prototype.render = function () {
     })
 }
 
+KCalcSelector.prototype.hasResult = function (value) {
+    return this.selected.indexOf(value) !== -1
+}
+
+KCalcSelector.prototype.removeResult = function (value) {
+    const idx = this.selected.indexOf(value)
+    if (idx === -1) { return }
+    this.selected.splice(idx, 1)
+}
+
 KCalcSelector.prototype.addResult = function (value) {
-    console.log(value)
+    this.selected.push(value)
 }
 
 KCalcSelector.prototype.showResults = function (results) {
@@ -112,7 +132,7 @@ KCalcSelector.prototype.showResults = function (results) {
     for (const result of results) {
         if (!result[idField]) { continue }
         added.push(result[idField])
-        const values = ['☐']
+        const values = ['']
         for (const fields of this.fields) {
             let value = ''
             for (const field of fields) {
@@ -127,7 +147,6 @@ KCalcSelector.prototype.showResults = function (results) {
             }
             values.push(value)
         }
-
         const node = KDom.create('DIV')
         node.id = result[idField]
         node.classList.add('k-calc-row')
@@ -138,8 +157,29 @@ KCalcSelector.prototype.showResults = function (results) {
         }
 
         node.addEventListener('click', event => {
-            console.log(event)
-            this.addResult(event.target.id)
+            const node = event.currentTarget
+            if (this.hasResult(node.id)) {
+                this.domNode.query('div.k-calc-body')
+                .then(newParent => {
+                    window.requestAnimationFrame(() => {
+                        node.classList.remove('k-selected')
+                        node.parentNode.removeChild(node)
+                        newParent.insertBefore(node, newParent.firstChild)
+                    })
+                }) 
+                this.removeResult(node.id)
+                return 
+            }
+
+            this.domNode.query('div.k-calc-selected')
+            .then(newParent => {
+                window.requestAnimationFrame(() => {
+                    node.classList.add('k-selected')
+                    node.parentNode.removeChild(node)
+                    newParent.insertBefore(node, newParent.firstChild)
+                })
+            })
+            this.addResult(node.id)
         })
 
         this.domNode.query('div.k-calc-body')
@@ -160,4 +200,8 @@ KCalcSelector.prototype.showResults = function (results) {
         }
     })
     this.currentSet = [...added]
+}
+
+KCalcSelector.prototype.getSelection = function () {
+    return this.selected
 }

@@ -2,7 +2,7 @@
     font-family: sans-serif;
 }
 
-.k-calc-body {
+.k-calc-body, .k-calc-selected {
     max-height: calc(1.2em * 12);
     overflow-y: scroll;
 }
@@ -26,6 +26,15 @@
     grid-template-columns: 24px repeat(var(--columns), 1fr);
 }
 
+.k-calc-selected:not(:empty) {
+    border-bottom: 2px solid black;
+    background-color:cornsilk;
+}
+
+.k-calc-row {
+    cursor: pointer;
+}
+
 .k-calc-row:hover {
     background-color: bisque;
 }
@@ -36,4 +45,12 @@
     max-height: 1.2em;
     line-height: 1.2em;
     margin: 4px;
+}
+
+.k-calc-row > div:first-child:before {
+    content: '☐';
+}
+
+.k-calc-row.k-selected > div:first-child:before {
+    content: '☒'
 }
