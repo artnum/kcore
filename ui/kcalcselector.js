@@ -167,7 +167,7 @@ KCalcSelector.prototype.showResults = function (results) {
         node.addEventListener('click', event => {
             const node = event.currentTarget
             if (this.hasResult(node.id)) {
-                this.evtTarget.dispatchEvent(new CustomEvent('remove-selection', {detail: node.id}))
+                if (!this.evtTarget.dispatchEvent(new CustomEvent('remove-selection', {detail: node.id, cancelable: true}))) { return }
                 this.domNode.query('div.k-calc-body')
                 .then(newParent => {
                     window.requestAnimationFrame(() => {
@@ -180,7 +180,7 @@ KCalcSelector.prototype.showResults = function (results) {
                 return 
             }
 
-            this.evtTarget.dispatchEvent(new CustomEvent('add-selection', {detail: node.id}))
+            if (!this.evtTarget.dispatchEvent(new CustomEvent('add-selection', {detail: node.id, cancelable: true}))) { return }
             this.domNode.query('div.k-calc-selected')
             .then(newParent => {
                 window.requestAnimationFrame(() => {
