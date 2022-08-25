@@ -11,6 +11,15 @@ function KCalcSelector (dataSource, headers) {
     this.fields = []
     this.currentSet = []
     this.selected = []
+    this.evtTarget = new EventTarget()
+}
+
+KCalcSelector.prototype.addEventListener = function (type, callback, options) {
+    this.evtTarget.addEventListener(type, callback, options)
+}
+
+KCalcSelector.prototype.removeEventListener = function (type, callback, options) {
+    this.evtTarget.removeEventListener(type, callback, options)
 }
 
 KCalcSelector.prototype.getNode = function () {
@@ -34,7 +43,6 @@ KCalcSelector.prototype.search = function (value) {
 
 KCalcSelector.prototype.render = function () {
     return new Promise(resolve => {
-
         const searchInput = KDom.create('div')
         searchInput.classList.add('k-calc-input')
         searchInput.innerHTML = '<input type="text" value=""></input>'
@@ -159,6 +167,7 @@ KCalcSelector.prototype.showResults = function (results) {
         node.addEventListener('click', event => {
             const node = event.currentTarget
             if (this.hasResult(node.id)) {
+                this.evtTarget.dispatchEvent(new CustomEvent('remove-selection', {detail: node.id}))
                 this.domNode.query('div.k-calc-body')
                 .then(newParent => {
                     window.requestAnimationFrame(() => {
@@ -171,6 +180,7 @@ KCalcSelector.prototype.showResults = function (results) {
                 return 
             }
 
+            this.evtTarget.dispatchEvent(new CustomEvent('add-selection', {detail: node.id}))
             this.domNode.query('div.k-calc-selected')
             .then(newParent => {
                 window.requestAnimationFrame(() => {
