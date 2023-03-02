@@ -373,16 +373,13 @@ function KSelectUI(input, store, options = { attribute: 'name', allowFreeText: t
 KSelectUI.prototype.mutation = function (mutations) {
     for (const mutation of mutations) {
         if (mutation.attributeName === 'data-value') {
-            this.mutObserve.disconnect()
+            if (this.object.value === mutation.target.dataset.value) { continue }
             this.object.value = mutation.target.dataset.value
-            this.mutObserve.observe(this.input, {attributes: true})
             continue
         }
         if (mutation.attributeName === 'class') {
             this.inputEventTarget.className = mutation.target.className
-            this.mutObserve.disconnect()
             mutation.target.className = ''
-            this.mutObserve.observe(this.input, {attributes: true})
             continue
         }
     }
