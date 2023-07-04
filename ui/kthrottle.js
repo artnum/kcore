@@ -1,6 +1,11 @@
 /* forward throttle, cancel previous timeout for auto-completion stuff :
  * user type, stop to remember and get autocompletion
  */
+
+function kdebounce (fn, delay) {
+    return kfwthrottle(fn, delay)
+}
+
 function kfwthrottle (fn, delay) {
     let timeout = null
     return function(...args) {
