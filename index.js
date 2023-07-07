@@ -12,13 +12,19 @@ function KCORELoad () {
             'net/krequest.js',
             'expression/k-query-expression.js',
             'ui/kselect.js',
+            'ui/kmultiselect.js',
             'ui/kclosable.js',
             'ui/kz.js',
             'ui/kcolor.js',
             'ui/kcalcselector.js',
             'ui/kdom.js',
             'ui/kthrottle.js',
+            'ui/kinput.js',
             'css/index.css'
+        ]
+
+        const modules = [
+            'ui/ktextarea.js'
         ]
 
         let url = `${location.origin}`
@@ -52,6 +58,15 @@ function KCORELoad () {
                     isScript ? node.src = `${url}/${script}`: node.href = `${url}/${script}`
                 }
                 isScript ? node.type = 'text/javascript' : node.rel = 'stylesheet'
+                document.head.appendChild(node)
+                node.addEventListener('load', event => { resolve() })
+            }))
+        }
+        for (const module of modules) {
+            promises.push(new Promise(resolve => { 
+                const node = document.createElement('SCRIPT') 
+                node.src = `${url}/${module}`
+                node.type = 'module'
                 document.head.appendChild(node)
                 node.addEventListener('load', event => { resolve() })
             }))
