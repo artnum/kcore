@@ -1,8 +1,9 @@
 /* a "calc sheet"-like selector */
-function KCalcSelector (dataSource, headers) {
+function KCalcSelector (dataSource, headers, title = '') {
     this.dataSource = dataSource
     this.domNode = KDom.create('DIV')
     this.domNode.classList.add('k-calc-selector')
+    this.domNode.setAttribute('tabindex', '0')
     this.inSelection = new Map()
     if (!(headers instanceof Map)) {
         headers = new Map(Object.entries(headers))
@@ -12,6 +13,7 @@ function KCalcSelector (dataSource, headers) {
     this.currentSet = []
     this.selected = []
     this.evtTarget = new EventTarget()
+    this.title = title
 }
 
 KCalcSelector.prototype.addEventListener = function (type, callback, options) {
@@ -41,11 +43,28 @@ KCalcSelector.prototype.search = function (value) {
     })
 }
 
+KCalcSelector.prototype.clearResults = function () {
+    return new Promise((resolve) => {
+        this.domNode.query('div.k-calc-body')
+        .then(node => {
+            window.requestAnimationFrame(() => node.innerHTML = '')
+        })
+        .catch(() => {})       
+    })
+}
+
 KCalcSelector.prototype.render = function () {
     return new Promise(resolve => {
         const searchInput = KDom.create('div')
         searchInput.classList.add('k-calc-input')
-        searchInput.innerHTML = '<input type="text" value=""></input>'
+        searchInput.innerHTML = `<input type="text" placeholder="${this.title}" value=""></input>`
+        this.domNode.addEventListener('keyup', event => {
+            const input = searchInput.querySelector('input')
+            if (event.key === 'Escape') {
+                this.clearResults()
+                input.value = ''
+            }
+        }, {capture: true})
         searchInput.addEventListener('input', kfwthrottle(event => {
             try {
                 this.search(event.target.value)
@@ -106,6 +125,13 @@ KCalcSelector.prototype.render = function () {
             this.domNode.append(selected)
         })
 
+        for (const x of this.selected ) {
+            this.getResult(x)
+            .then(node => {
+                selected.append(node)
+            })
+        }
+
         const body = KDom.create('div')
         body.classList.add('k-calc-body')
         this.domNode.query('div.k-calc-body')
@@ -117,6 +143,17 @@ KCalcSelector.prototype.render = function () {
         })
         
         return resolve(this.getNode())
+    })
+}
+
+KCalcSelector.prototype.getResult = function (value) {
+    return new Promise((resolve, reject) => {
+        this.dataSource.get(value)
+        .then(x => {
+            const node = this.makeEntry(x)
+            node.classList.add('k-selected')
+            resolve(node)
+        })
     })
 }
 
@@ -134,63 +171,72 @@ KCalcSelector.prototype.addResult = function (value) {
     this.selected.push(value)
 }
 
+KCalcSelector.prototype.makeEntry = function (entry) {
+    const idField = this.headers.get('_id')
+    
+    const values = ['']
+    for (const fields of this.fields) {
+        let value = ''
+        for (const field of fields) {
+            if (entry[field] === undefined) { continue }
+            if (entry[field] === null) { continue }
+            if (entry[field] === '') { continue }
+            if (Array.isArray(entry[field])) {
+                value = entry[field][0]
+                break
+            }
+            value = entry[field]
+        }
+        values.push(value)
+    }
+
+    const node = KDom.create('DIV')
+    node.id = entry[idField]
+    node.classList.add('k-calc-row')
+    for (const value of values) {
+        const field = KDom.create('DIV')
+        field.innerHTML = value
+        node.append(field)
+    }
+
+    node.addEventListener('click', event => {
+        const node = event.currentTarget
+        if (this.hasResult(node.id)) {
+            if (!this.evtTarget.dispatchEvent(new CustomEvent('remove-selection', {detail: node.id, cancelable: true}))) { return }
+            this.domNode.query('div.k-calc-body')
+            .then(newParent => {
+                window.requestAnimationFrame(() => {
+                    node.classList.remove('k-selected')
+                    node.parentNode.removeChild(node)
+                    newParent.insertBefore(node, newParent.firstChild)
+                })
+            }) 
+            this.removeResult(node.id)
+            return 
+        }
+
+        if (!this.evtTarget.dispatchEvent(new CustomEvent('add-selection', {detail: node.id, cancelable: true}))) { return }
+        this.domNode.query('div.k-calc-selected')
+        .then(newParent => {
+            window.requestAnimationFrame(() => {
+                node.classList.add('k-selected')
+                node.parentNode.removeChild(node)
+                newParent.insertBefore(node, newParent.firstChild)
+            })
+        })
+        this.addResult(node.id)
+    })
+    return node
+}
+
 KCalcSelector.prototype.showResults = function (results) {
     const idField = this.headers.get('_id')
     const added = []
     for (const result of results) {
         if (!result[idField]) { continue }
         added.push(result[idField])
-        const values = ['']
-        for (const fields of this.fields) {
-            let value = ''
-            for (const field of fields) {
-                if (result[field] === undefined) { continue }
-                if (result[field] === null) { continue }
-                if (result[field] === '') { continue }
-                if (Array.isArray(result[field])) {
-                    value = result[field][0]
-                    break
-                }
-                value = result[field]
-            }
-            values.push(value)
-        }
-        const node = KDom.create('DIV')
-        node.id = result[idField]
-        node.classList.add('k-calc-row')
-        for (const value of values) {
-            const field = KDom.create('DIV')
-            field.innerHTML = value
-            node.append(field)
-        }
-
-        node.addEventListener('click', event => {
-            const node = event.currentTarget
-            if (this.hasResult(node.id)) {
-                if (!this.evtTarget.dispatchEvent(new CustomEvent('remove-selection', {detail: node.id, cancelable: true}))) { return }
-                this.domNode.query('div.k-calc-body')
-                .then(newParent => {
-                    window.requestAnimationFrame(() => {
-                        node.classList.remove('k-selected')
-                        node.parentNode.removeChild(node)
-                        newParent.insertBefore(node, newParent.firstChild)
-                    })
-                }) 
-                this.removeResult(node.id)
-                return 
-            }
-
-            if (!this.evtTarget.dispatchEvent(new CustomEvent('add-selection', {detail: node.id, cancelable: true}))) { return }
-            this.domNode.query('div.k-calc-selected')
-            .then(newParent => {
-                window.requestAnimationFrame(() => {
-                    node.classList.add('k-selected')
-                    node.parentNode.removeChild(node)
-                    newParent.insertBefore(node, newParent.firstChild)
-                })
-            })
-            this.addResult(node.id)
-        })
+        
+        const node = this.makeEntry(result)
 
         this.domNode.query('div.k-calc-body')
         .then(body => {
@@ -214,4 +260,10 @@ KCalcSelector.prototype.showResults = function (results) {
 
 KCalcSelector.prototype.getSelection = function () {
     return this.selected
+}
+
+KCalcSelector.prototype.setSelection = function (selection) {
+    if (!Array.isArray(selection)) { selection = [selection]}
+    this.selected = selection
+    
 }

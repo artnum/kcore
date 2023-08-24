@@ -13,6 +13,7 @@
 }
 
 .kdropdown div {
+    min-height: 16px;
     cursor: pointer;
     padding: 2px;
     width: calc(100% - 4px); /* enleve le padding gauche/droite */

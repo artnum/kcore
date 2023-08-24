@@ -1,4 +1,4 @@
-function KSelectUI(input, store, options = { attribute: 'name', allowFreeText: true, realSelect: false }) {
+function KSelectUI(input, store, options = { attribute: 'name', allowFreeText: true, realSelect: false, allowNone: false }) {
     if (!(input instanceof HTMLInputElement)) {
         throw new Error('Not an Input element')
     }
@@ -6,6 +6,7 @@ function KSelectUI(input, store, options = { attribute: 'name', allowFreeText: t
     this.EvtTarget = new EventTarget()
     this.value = undefined
     this._oldValue = undefined
+    this.options = options
     this.allowFreeText = options.allowFreeText
     this.input = input
     this.mutObserve.observe(this.input, {attributes: true})
@@ -243,7 +244,9 @@ function KSelectUI(input, store, options = { attribute: 'name', allowFreeText: t
                 if (this.tree) {
                     data = this.treeSort(data)
                 }
-            
+                if (options.allowNone) {
+                    data.unshift({label: ' ', uid: 0, id: 0})
+                }
                 const frag = document.createDocumentFragment()
                 let selected = null
                 for (const entry of data) {
@@ -448,7 +451,7 @@ KSelectUI.prototype.realSelectUI = function () {
 }
 
 KSelectUI.prototype.setValue = function (value) {
-    if (!value) { return }
+    if (!value && !this.options.allowNone) { return }
     this._oldValue = this.value
     this.value = value
     if (this.input.dataset.value !== value) { this.input.dataset.value = value }
